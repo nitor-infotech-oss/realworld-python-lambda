@@ -26,11 +26,11 @@ git clone https://github.com/nitor-infotech-oss/refarch-webapp-serverless.git
 a.Deploy the Service:
 Use this when you have made changes to your Functions, Events or Resources in serverless.yml or you simply want to deploy all changes within your Service at the same time.
 ```
-        serverless deploy -v
+        sls deploy -v
 ```
 b. Deploy the Function:
 Use this to quickly upload and overwrite your function code, allowing you to develop faster.
 ```
-        serverless deploy function -f hello
+        sls deploy function -f hello
 ```
 
