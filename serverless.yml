@@ -11,7 +11,7 @@
 #
 # Happy Coding!
 
-service: refarch-webapp-serverless # NOTE: update this with your service name
+service: realworld-python-lambda # NOTE: update this with your service name
 #app: your-app-name
 #tenant: your-tenant-name
 
@@ -63,7 +63,7 @@ functions:
 
 resources:
   Resources:
-    TodosDynamoDbTable:
+    LambdaDynamoDbTable:
       Type: 'AWS::DynamoDB::Table'
       DeletionPolicy: Retain
       Properties:
