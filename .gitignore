@@ -1,4 +1,8 @@
 # Distribution / packaging
+*.log
+*.pot
+*.pyc
+__pycache__/
 .Python
 env/
 build/
@@ -15,8 +19,6 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
-api/__pycache__
-__pycache__/
 .idea/
 
 # Serverless directories
