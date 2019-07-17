@@ -1,4 +1,4 @@
-# refarch-webapp-serverless
+# realworld-python-lambda
 This application is based on AWS Lambda function,DynamoDB,API Gateway using serverless framework with python
 
 # **Getting started**
@@ -6,7 +6,7 @@ This application is based on AWS Lambda function,DynamoDB,API Gateway using serv
 
 Clone this repo:
 ```
-git clone https://github.com/nitor-infotech-oss/refarch-webapp-serverless.git
+git clone https://github.com/nitor-infotech-oss/realworld-python-lambda.git
 ```
 # Serverless Framework
 
@@ -18,8 +18,8 @@ git clone https://github.com/nitor-infotech-oss/refarch-webapp-serverless.git
 ```
 2     # Step 2.Create a new Serverless Service/Project
 ```
-        sls create --template aws-python3 --path refarch-webapp-serverless
-        cd refarch-webapp-serverless
+        sls create --template aws-python3 --path realworld-python-lambda
+        cd realworld-python-lambda
 ```
 3     # Deploy, test and diagnose your service
 
