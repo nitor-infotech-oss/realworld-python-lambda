@@ -4,15 +4,14 @@ import logging
 import uuid
 import time
 from datetime import datetime
+from boto3.dynamodb.conditions import Key, Attr
 import boto3
 
 dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
 
 
 # create user
-def createUser(event, context):
-    print(event)
-    print('context', context)
+def create_user(event, context):
     data = json.loads(event['body'])
     if 'username' not in data:
         logging.error("Validation Failed")
@@ -24,13 +23,17 @@ def createUser(event, context):
         logging.error("Validation Failed")
         raise Exception("Password must be specified.", 422)
 
+    timestamp = str(datetime.utcnow().timestamp())
+
     table = dynamodb.Table('users')
 
     item = {
         'id': str(uuid.uuid1()),
         'username': data['username'],
         'email': data['email'],
-        'password': data['password']
+        'password': data['password'],
+        'createdAt': timestamp,
+        'updatedAt': timestamp
     }
 
     # create the user to the database
@@ -45,8 +48,33 @@ def createUser(event, context):
     return response
 
 
+# login user
+def login_user(event, context):
+    username = event['username']
+    password = event['password']
+    table = dynamodb.Table('users')
+    result = table.scan(
+        FilterExpression=Attr('username').eq(username) & Attr('password').eq(password)
+    )
+
+    if result['Items']:
+        message = {"msg": "Login success", "data": result['Items']}
+    else:
+        message = "Login Failed"
+
+    response = {
+        "statusCode": 200,
+        "headers": {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Credentials': 'true'
+        },
+        "body": json.dumps(message)
+    }
+    return response
+
+
 # get user
-def getUser(event, context):
+def get_user(event, context):
     table = dynamodb.Table('users')
     result = table.scan()
 
@@ -59,7 +87,7 @@ def getUser(event, context):
     return response
 
 
-def updateUser(event, context):
+def update_user(event, context):
     data = json.loads(event['body'])
     if 'username' not in data or 'password' not in data:
         logging.error("Validation Failed")

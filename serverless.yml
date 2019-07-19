@@ -39,22 +39,29 @@ provider:
 
 
 functions:
-  createUser:
-    handler: api/users.createUser
+  create_user:
+    handler: api/users.create_user
     events:
       - http:
           path: user
           method: post
           cors: true
-  getUser:
-    handler: api/users.getUser
+  login_user:
+    handler: api/users.login_user
     events:
       - http:
           path: user
           method: GET
           cors: true
-  updateUser:
-    handler: api/users.updateUser
+  get_user:
+    handler: api/users.get_user
+    events:
+      - http:
+          path: user
+          method: GET
+          cors: true
+  update_user:
+    handler: api/users.update_user
     events:
       - http:
           path: user
