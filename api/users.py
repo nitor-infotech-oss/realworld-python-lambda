@@ -12,14 +12,14 @@ dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
 
 # create user
 def create_user(event, context):
-    data = json.loads(event['body'])
-    if 'username' not in data:
+    # data = json.loads(event['body'])
+    if 'username' not in event:
         logging.error("Validation Failed")
         raise Exception("User must be specified.", 422)
-    if 'email' not in data:
+    if 'email' not in event:
         logging.error("Validation Failed")
         raise Exception("Email must be specified.", 422)
-    if 'password' not in data:
+    if 'password' not in event:
         logging.error("Validation Failed")
         raise Exception("Password must be specified.", 422)
 
@@ -29,9 +29,9 @@ def create_user(event, context):
 
     item = {
         'id': str(uuid.uuid1()),
-        'username': data['username'],
-        'email': data['email'],
-        'password': data['password'],
+        'username': event['username'],
+        'email': event['email'],
+        'password': event['password'],
         'createdAt': timestamp,
         'updatedAt': timestamp
     }
