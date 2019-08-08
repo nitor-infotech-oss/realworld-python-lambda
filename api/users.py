@@ -30,7 +30,7 @@ def create_user(event, context):
     table = dynamodb.Table('dev-users')
 
     # Verify username is not taken
-    user_exists = check_username_exists(data['username'])
+    user_exists = get_user_by_username(data['username'])
     if 'Item' not in user_exists:
         pass
     else:
@@ -38,7 +38,7 @@ def create_user(event, context):
         raise Exception(f"Username already taken: {data['username']}", 422)
 
     # Verify email is not taken
-    email_exists = check_email_exists(data['email'])
+    email_exists = get_user_by_email(data['email'])
     if email_exists['Count'] != 0:
         logging.error("Validation Failed")
         raise Exception(f"Email already taken: {data['email']}", 422)
@@ -46,6 +46,7 @@ def create_user(event, context):
     # password = data['password'].encode()
     # hashed = bcrypt.hashpw(password, bcrypt.gensalt())
     # encoded = jwt.encode({'token': data['username']}, 'secret', algorithm='HS256')
+    # print(encoded)
     item = {
         # 'id': str(uuid.uuid1()),
         # 'id': data['id'],
@@ -81,9 +82,9 @@ def create_user(event, context):
     return response
 
 
-def check_username_exists(username):
+def get_user_by_username(username):
     table = dynamodb.Table('dev-users')
-
+    print(username)
     try:
         response = table.get_item(
             Key={
@@ -96,9 +97,9 @@ def check_username_exists(username):
     return response
 
 
-def check_email_exists(aemail):
+def get_user_by_email(aemail):
     table = dynamodb.Table('dev-users')
-    print(aemail)
+    # print(aemail)
     response = table.query(
         IndexName='email',
         KeyConditionExpression='email= :email',
@@ -125,7 +126,7 @@ def login_user(event, context):
         raise Exception("Password must be specified.", 422)
 
     # Get user with this email
-    get_user_with_this_email = check_email_exists(data['email'])
+    get_user_with_this_email = get_user_by_email(data['email'])
     if get_user_with_this_email['Count'] != 1:
         logging.error("Validation Failed")
         raise Exception(f"Email not fount: {data['email']}.", 422)
@@ -158,50 +159,107 @@ def login_user(event, context):
 
 # get user
 def get_user(event, context):
-    table = dynamodb.Table('users')
-    result = table.scan()
+    authenticated_user = authenticate_and_get_user(event, context)
+    if not authenticated_user:
+        raise Exception('Token not present or invalid.', 422)
 
-    # create a response
-    response = {
-        "statusCode": 200,
-        "body": json.dumps(result['Items'])
+    body = {
+        'user': {
+            'email': authenticated_user['email'],
+            # 'token': get_token_from_event(event, context),
+            'username': authenticated_user['username']
+            # 'bio': authenticatedUser.bio | | '',
+            # 'image': authenticatedUser.image | | ''
+        }
     }
 
+    response = {
+        "statusCode": 200,
+        "headers": {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Credentials': 'true'
+        },
+        "body": body
+    }
     return response
 
 
 def update_user(event, context):
-    data = json.loads(event['body'])
-    if 'username' not in data or 'password' not in data:
+    authenticated_user = authenticate_and_get_user(event, context)
+    if not authenticated_user:
+        raise Exception('Token not present or invalid.', 422)
+    user = event
+    # data = json.loads(event['body'])
+    print(f"DATA: {user}")
+    if not user:
         logging.error("Validation Failed")
-        raise Exception("Couldn't update the user.")
-        return
+        raise Exception("User must be specified.", 422)
 
-    table = dynamodb.Table('users')
-
-    # update the user in the database
-    result = table.update_item(
-        Key={
-            'id': data['id'],
-            'username': data['username']
-
-        },
-        ExpressionAttributeNames={
-            '#email': 'email',
-        },
-        ExpressionAttributeValues={
-            ':email': data['email'],
-            ':password': data['password']
-        },
-        UpdateExpression='SET #email = :email, '
-                         'password = :password',
-        ReturnValues='ALL_NEW',
-    )
-
-    # create a response
-    response = {
-        "statusCode": 200,
-        "body": json.dumps(result['Attributes'])
+    updated_user = {
+        'username': authenticated_user['username']
     }
 
+    if user['email']:
+        # Verify email is not taken
+        user_with_this_email = get_user_by_email(user['email'])
+        if user_with_this_email['Count'] != 0:
+            return Exception(f"Email already taken: {user['email']}", 422)
+
+        updated_user['email'] = user['email']
+        
+    if user['password']:
+        # updatedUser.password = bcrypt.hashSync(user.password, 5);
+        updated_user['password'] = user['password']
+
+    if user['image']:
+        updated_user['image'] = user['image']
+
+    if user['bio']:
+        updated_user['bio'] = user['bio']   
+        
+    print(f"UPDATE: {updated_user}")
+    
+    table = dynamodb.Table('dev-users')
+    table.put_item(Item=updated_user)
+
+    if updated_user['password']:
+        del updated_user['password']
+
+    if not updated_user['email']:
+        updated_user['email'] = authenticated_user['email']
+
+    if not updated_user['image']:
+        updated_user['image'] = authenticated_user['image'] if authenticated_user['image'] else ''
+
+    if not updated_user['bio']:
+        updated_user['bio'] = authenticated_user['bio'] if authenticated_user['bio'] else ''
+
+    # updated_user['token'] = get_token_from_event(event, context)
+    
+    response = {
+        "statusCode": 200,
+        "headers": {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Credentials': 'true'
+        },
+        "body": updated_user
+    }
+    
     return response
+
+
+def get_token_from_event(event, context):
+    pass
+    # return event.headers.Authorization.replace('Token ', '')
+    return event['headers']['authorization'].replace('Token', '')
+
+
+def authenticate_and_get_user(event, context):
+    try:
+        # token = get_token_from_event(event, context)
+        # decoded = jwt.verify(token, Util.tokenSecret),
+        username = event['username']  # decoded.username,
+        authenticated_user = get_user_by_username(username)
+        return authenticated_user['Item']
+    except Exception as e:
+        return None
