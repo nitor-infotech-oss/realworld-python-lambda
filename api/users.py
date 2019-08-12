@@ -4,9 +4,11 @@ import logging
 import uuid
 import time
 from datetime import datetime
+import boto3
 from boto3.dynamodb.conditions import Key, Attr
 # import bcrypt
 # import jwt
+from src.util import envelop
 
 dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
 
@@ -49,7 +51,6 @@ def create_user(event, context):
     # print(encoded)
     item = {
         # 'id': str(uuid.uuid1()),
-        # 'id': data['id'],
         'username': data['username'],
         'email': data['email'],
         'password': data['password'],
@@ -61,13 +62,11 @@ def create_user(event, context):
     table.put_item(Item=item)
     token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbiI6ImdhdXRhbSJ9.5CLsX4nOuTagsC6nSGWfq-4oZZAL0RhlMLOm7QMGy_Q'
     body = {
-        'user': {
-            'email': data['email'],
-            'token': token,
-            'username': data['username'],
-            'bio': '',
-            'image': '',
-        }
+        'email': data['email'],
+        'token': token,
+        'username': data['username'],
+        'bio': '',
+        'image': ''
     }
     # create a response
     response = {
@@ -76,7 +75,7 @@ def create_user(event, context):
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Credentials': 'true'
         },
-        "body": body
+        "user": body
     }
 
     return response
@@ -137,13 +136,11 @@ def login_user(event, context):
     token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbiI6ImdhdXRhbSJ9.5CLsX4nOuTagsC6nSGWfq-4oZZAL0RhlMLOm7QMGy_Q'
 
     authenticated_user = {
-        'user': {
-            'email': data['email'],
-            'token': token,
-            'username': get_user_with_this_email['Items'][0]['username']
-            # 'bio': get_user_with_this_email['Items'][0]['bio'] | '',
-            # 'image': get_user_with_this_email['Items'][0]['image'] | ''
-        }
+        'email': data['email'],
+        'token': token,
+        'username': get_user_with_this_email['Items'][0]['username']
+        # 'bio': get_user_with_this_email['Items'][0]['bio'] if get_user_with_this_email['Items'][0]['bio'] else '',
+        # 'image': get_user_with_this_email['Items'][0]['image'] if get_user_with_this_email['Items'][0]['image'] else ''
     }
 
     response = {
@@ -152,7 +149,7 @@ def login_user(event, context):
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Credentials': 'true'
         },
-        "body": authenticated_user
+        "user": authenticated_user
     }
     return response
 
@@ -164,13 +161,11 @@ def get_user(event, context):
         raise Exception('Token not present or invalid.', 422)
 
     body = {
-        'user': {
-            'email': authenticated_user['email'],
-            # 'token': get_token_from_event(event, context),
-            'username': authenticated_user['username']
-            # 'bio': authenticatedUser.bio | | '',
-            # 'image': authenticatedUser.image | | ''
-        }
+        'email': authenticated_user['email'],
+        # 'token': get_token_from_event(event, context),
+        'username': authenticated_user['username']
+        # 'bio': authenticated_user['bio'] if authenticated_user['bio'] else '',
+        # 'image':  authenticated_user['image'] if authenticated_user['image'] else ''
     }
 
     response = {
@@ -179,7 +174,7 @@ def get_user(event, context):
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Credentials': 'true'
         },
-        "body": body
+        "user": body
     }
     return response
 
@@ -189,7 +184,6 @@ def update_user(event, context):
     if not authenticated_user:
         raise Exception('Token not present or invalid.', 422)
     user = event
-    # data = json.loads(event['body'])
     print(f"DATA: {user}")
     if not user:
         logging.error("Validation Failed")
@@ -206,7 +200,7 @@ def update_user(event, context):
             return Exception(f"Email already taken: {user['email']}", 422)
 
         updated_user['email'] = user['email']
-        
+
     if user['password']:
         # updatedUser.password = bcrypt.hashSync(user.password, 5);
         updated_user['password'] = user['password']
@@ -215,10 +209,10 @@ def update_user(event, context):
         updated_user['image'] = user['image']
 
     if user['bio']:
-        updated_user['bio'] = user['bio']   
-        
+        updated_user['bio'] = user['bio']
+
     print(f"UPDATE: {updated_user}")
-    
+
     table = dynamodb.Table('dev-users')
     table.put_item(Item=updated_user)
 
@@ -235,7 +229,7 @@ def update_user(event, context):
         updated_user['bio'] = authenticated_user['bio'] if authenticated_user['bio'] else ''
 
     # updated_user['token'] = get_token_from_event(event, context)
-    
+
     response = {
         "statusCode": 200,
         "headers": {
@@ -244,7 +238,21 @@ def update_user(event, context):
         },
         "body": updated_user
     }
-    
+
+    return response
+
+
+def get_profile(event, context):
+    username = event['pathParameters']['username']
+    authenticated_user = authenticate_and_get_user(event, context)
+    profile = get_profile_by_username(username, authenticated_user);
+    print(f"PROFILE: {profile}")
+    if not profile:
+        raise Exception(f"User not found: ${username}", 422)
+
+    response = {
+        "profile": profile
+    }
     return response
 
 
@@ -254,11 +262,35 @@ def get_token_from_event(event, context):
     return event['headers']['authorization'].replace('Token', '')
 
 
+def get_profile_by_username(a_username, a_authenticated_user):
+    user = get_user_by_username(a_username)['Item']
+    print(f"PROFILE USER: {user}")
+    if not user:
+        return None
+
+    profile = {
+        'username': user['username']
+        # 'bio': user['bio'] if user['bio'] else '',
+        # 'image': user['image'] if user['image'] else '',
+        # 'following': False,
+    }
+
+    # If user is authenticated, set following bit
+    # if user['followers'] and a_authenticated_user:
+    #     profile['following'] = user['followers'].values.includes(a_authenticated_user.username)
+
+    return profile
+
+
 def authenticate_and_get_user(event, context):
+    if 'username' in event:
+        username = event['username']
+    else:
+        username = event['pathParameters']['username']
     try:
         # token = get_token_from_event(event, context)
         # decoded = jwt.verify(token, Util.tokenSecret),
-        username = event['username']  # decoded.username,
+        username = username  # decoded.username,
         authenticated_user = get_user_by_username(username)
         return authenticated_user['Item']
     except Exception as e:
