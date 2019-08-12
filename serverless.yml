@@ -22,10 +22,9 @@ service: realworld-python-lambda # NOTE: update this with your service name
 provider:
   name: aws
   runtime: python3.7
-#  profile: update this with your profile
   region: us-west-2
   environment:
-    DYNAMODB_TABLE: users
+    DYNAMODB_NAMESPACE: ${opt:stage, "dev"}
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -35,54 +34,74 @@ provider:
         - dynamodb:PutItem
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
-      Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE}"
+      Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/*"
 
 
 functions:
   create_user:
-    handler: api/users.create_user
+    handler: src/user.create_user
     events:
       - http:
-          path: user
+          path: /api/users
           method: post
           cors: true
   login_user:
-    handler: api/users.login_user
+    handler: src/user.login_user
     events:
       - http:
-          path: user
-          method: GET
+          path: /api/users/login
+          method: POST
           cors: true
   get_user:
-    handler: api/users.get_user
+    handler: src/user.get_user
     events:
       - http:
-          path: user
+          path: /api/user
           method: GET
           cors: true
   update_user:
-    handler: api/users.update_user
+    handler: src/user.update_user
     events:
       - http:
-          path: user
+          path: /api/user
           method: PUT
+          cors: true
+  get_profile:
+    handler: src/user.get_profile
+    events:
+      - http:
+          method: GET
+          path: /api/profiles/{username}
           cors: true
 
 resources:
   Resources:
-    LambdaDynamoDbTable:
+
+    UsersDynamoDbTable:
       Type: 'AWS::DynamoDB::Table'
       DeletionPolicy: Retain
       Properties:
         AttributeDefinitions:
           -
-            AttributeName: id
+            AttributeName: username
+            AttributeType: S
+          - AttributeName: email
             AttributeType: S
         KeySchema:
           -
-            AttributeName: id
+            AttributeName: username
             KeyType: HASH
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-TableName: ${self:provider.environment.DYNAMODB_TABLE}
+        TableName: ${self:provider.environment.DYNAMODB_NAMESPACE}-users
+        GlobalSecondaryIndexes:
+          - IndexName: email
+            KeySchema:
+              - AttributeName: email
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
