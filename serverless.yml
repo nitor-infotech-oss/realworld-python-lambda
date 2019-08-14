@@ -73,6 +73,21 @@ functions:
           method: GET
           path: /api/profiles/{username}
           cors: true
+  follow_user:
+    handler: src/user.follow
+    events:
+      - http:
+          method: POST
+          path: /api/profiles/{username}/follow
+          cors: true
+
+  unfollow_user:
+    handler: src/user.follow
+    events:
+      - http:
+          method: DELETE
+          path: /api/profiles/{username}/follow
+          cors: true          
 
 resources:
   Resources:
