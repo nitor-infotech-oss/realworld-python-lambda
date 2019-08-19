@@ -1,0 +1,6 @@
+bcrypt==3.1.7
+cffi==1.12.3
+jsonify==0.5
+pycparser==2.19
+PyJWT==1.7.1
+six==1.12.0

@@ -1,23 +1,4 @@
-# Welcome to Serverless!
-#
-# This file is the main config file for your service.
-# It's very minimal at this point and uses default values.
-# You can always add more config options for more control.
-# We've included some commented out config examples here.
-# Just uncomment any of them to get that config option.
-#
-# For full config options, check the docs:
-#    docs.serverless.com
-#
-# Happy Coding!
-
 service: realworld-python-lambda # NOTE: update this with your service name
-#app: your-app-name
-#tenant: your-tenant-name
-
-# You can pin your service to only deploy with a specific Serverless version
-# Check out our docs for more details
-# frameworkVersion: "=X.X.X"
 
 provider:
   name: aws
@@ -36,8 +17,18 @@ provider:
         - dynamodb:DeleteItem
       Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/*"
 
+#plugins:
+#  - serverless-python-requirements
+
+#custom:
+#  pythonRequirements:
+#    dockerizePip: non-linux
+# you can overwrite defaults here
+#  stage: dev
+#  region: us-east-1
 
 functions:
+  # User API
   create_user:
     handler: src/user.create_user
     events:
@@ -45,6 +36,7 @@ functions:
           path: /api/users
           method: post
           cors: true
+
   login_user:
     handler: src/user.login_user
     events:
@@ -52,6 +44,7 @@ functions:
           path: /api/users/login
           method: POST
           cors: true
+
   get_user:
     handler: src/user.get_user
     events:
@@ -59,6 +52,7 @@ functions:
           path: /api/user
           method: GET
           cors: true
+
   update_user:
     handler: src/user.update_user
     events:
@@ -66,6 +60,7 @@ functions:
           path: /api/user
           method: PUT
           cors: true
+
   get_profile:
     handler: src/user.get_profile
     events:
@@ -73,6 +68,7 @@ functions:
           method: GET
           path: /api/profiles/{username}
           cors: true
+
   follow_user:
     handler: src/user.follow
     events:
@@ -87,7 +83,32 @@ functions:
       - http:
           method: DELETE
           path: /api/profiles/{username}/follow
-          cors: true          
+          cors: true
+
+  # Comment API
+  create_comment:
+    handler: src/comment.create
+    events:
+      - http:
+          method: POST
+          path: /api/articles/{slug}/comments
+          cors: true
+
+  get_comments:
+    handler: src/comment.get
+    events:
+      - http:
+          method: GET
+          path: /api/articles/{slug}/comments
+          cors: true
+
+  delete_comment:
+    handler: src/comment.delete
+    events:
+      - http:
+          method: DELETE
+          path: /api/articles/{slug}/comments/{id}
+          cors: true
 
 resources:
   Resources:
@@ -114,6 +135,33 @@ resources:
           - IndexName: email
             KeySchema:
               - AttributeName: email
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+
+    CommentsDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: slug
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DYNAMODB_NAMESPACE}-comments
+        GlobalSecondaryIndexes:
+          - IndexName: article
+            KeySchema:
+              - AttributeName: slug
                 KeyType: HASH
             Projection:
               ProjectionType: ALL

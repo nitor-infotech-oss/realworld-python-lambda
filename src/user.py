@@ -1,5 +1,3 @@
-import os
-import json
 import logging
 import uuid
 import time
@@ -82,44 +80,6 @@ def create_user(event, context):
         "user": body
     }
 
-    return response
-
-
-def min_token(a_username):
-    payload = {
-        'username': a_username,
-        'expiresIn': datetime.utcnow() + timedelta(seconds=JWT_EXP_DELTA_SECONDS)
-    }
-    jwt_token = jwt.encode(payload, JWT_SECRET, JWT_ALGORITHM)
-    return jwt_token
-
-
-def get_user_by_username(username):
-    table = dynamodb.Table('dev-users')
-    print(username)
-    try:
-        response = table.get_item(
-            Key={
-                'username': username
-            }
-        )
-    except Exception as e:
-        response = None
-    print(f"RESP:{response}")
-    return response
-
-
-def get_user_by_email(a_email):
-    table = dynamodb.Table('dev-users')
-    response = table.query(
-        IndexName='email',
-        KeyConditionExpression='email= :email',
-        ExpressionAttributeValues={
-            ':email': a_email,
-        },
-        Select='ALL_ATTRIBUTES',
-    )
-    print(f"EMAIL:{response}")
     return response
 
 
@@ -255,6 +215,10 @@ def update_user(event, context):
     return response
 
 
+authenticate_and_get_user(event, context)
+get_user_by_username(username)
+
+
 def get_profile(event, context):
     username = event['pathParameters']['username']
     authenticated_user = authenticate_and_get_user(event, context)
@@ -267,6 +231,9 @@ def get_profile(event, context):
         "profile": profile
     }
     return response
+
+
+get_profile_by_username(a_username, a_authenticated_user)
 
 
 def follow(event, context):
@@ -300,12 +267,12 @@ def follow(event, context):
 
     # Update "following" field on follower user
     if should_follow:
-        if authenticated_user['following'] and authenticated_user['following'] not in username:
+        if authenticated_user['following'] and username not in authenticated_user['following']:
             authenticated_user['following'].append(username)
         else:
             authenticated_user['following'] = [username]
     else:
-        if authenticated_user['following'] and authenticated_user['following'] in username:
+        if authenticated_user['following'] and username in authenticated_user['following']:
             # create new list of following except username
             result = filter(lambda x: x != username, authenticated_user['following'])
             authenticated_user['following'] = list(result)
@@ -345,6 +312,44 @@ def get_followed_users(a_username):
     )['Item']
 
     return user['following'] or user['following']== []
+
+
+def min_token(a_username):
+    payload = {
+        'username': a_username,
+        'expiresIn': datetime.utcnow() + timedelta(seconds=JWT_EXP_DELTA_SECONDS)
+    }
+    jwt_token = jwt.encode(payload, JWT_SECRET, JWT_ALGORITHM)
+    return jwt_token
+
+
+def get_user_by_email(a_email):
+    table = dynamodb.Table('dev-users')
+    response = table.query(
+        IndexName='email',
+        KeyConditionExpression='email= :email',
+        ExpressionAttributeValues={
+            ':email': a_email,
+        },
+        Select='ALL_ATTRIBUTES',
+    )
+    print(f"EMAIL:{response}")
+    return response
+
+
+def get_user_by_username(username):
+    table = dynamodb.Table('dev-users')
+    print(username)
+    try:
+        response = table.get_item(
+            Key={
+                'username': username
+            }
+        )
+    except Exception as e:
+        response = None
+    print(f"RESP:{response}")
+    return response
 
 
 def get_token_from_event(event, context):
