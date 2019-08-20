@@ -20,7 +20,7 @@ def create(event, context):
         raise Exception("Comment must be specified", 422)
 
     table = dynamodb.Table('dev-article')
-    comment_body = data['comment']['body']
+    comment_body = data['comment.py']['body']
     slug = event['pathParameters']['slug']
     article = table.get_item(
         Key={
@@ -108,7 +108,7 @@ def delete(event, context):
     if not comment:
         raise Exception(f"Comment ID not found: {comment_id}", 422)
 
-    # Only comment author can delete comment
+    # Only comment.py author can delete comment
     if not comment['author'] == authenticated_user['username']:
         raise Exception(f"Only comment author can delete: {comment['author']}", 422)
 
@@ -127,4 +127,3 @@ def delete(event, context):
         "comments": data
     }
     return response
-

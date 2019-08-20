@@ -85,6 +85,63 @@ functions:
           path: /api/profiles/{username}/follow
           cors: true
 
+  # Article API
+  create_article:
+    handler: src/article.create_article
+    events:
+      - http:
+          method: POST
+          path: /api/articles
+          cors: true
+
+  get_article:
+    handler: src/article.get_article
+    events:
+      - http:
+          method: GET
+          path: /api/articles/{slug}
+          cors: true
+
+  update_article:
+    handler: src/article.update_article
+    events:
+      - http:
+          method: PUT
+          path: /api/articles/{slug}
+          cors: true
+
+  delete_article:
+    handler: src/article.delete_article
+    events:
+      - http:
+          method: DELETE
+          path: /api/articles/{slug}
+          cors: true
+
+  favorite_article:
+    handler: src/article.favorite_article
+    events:
+      - http:
+          method: POST
+          path: /api/articles/{slug}/favorite
+          cors: true
+
+  unfavorite_article:
+    handler: src/article.favorite_article
+    events:
+      - http:
+          method: DELETE
+          path: /api/articles/{slug}/favorite
+          cors: true
+
+  list_article:
+    handler: src/article.list_article
+    events:
+      - http:
+          method: GET
+          path: /api/articles
+          cors: true
+
   # Comment API
   create_comment:
     handler: src/comment.create
@@ -136,6 +193,37 @@ resources:
             KeySchema:
               - AttributeName: email
                 KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+
+    ArticlesDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: slug
+            AttributeType: S
+          - AttributeName: dummy
+            AttributeType: S
+          - AttributeName: updatedAt
+            AttributeType: N
+        KeySchema:
+          - AttributeName: slug
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DYNAMODB_NAMESPACE}-articles
+        GlobalSecondaryIndexes:
+          - IndexName: updatedAt
+            KeySchema:
+              - AttributeName: dummy
+                KeyType: HASH
+              - AttributeName: updatedAt
+                KeyType: RANGE
             Projection:
               ProjectionType: ALL
             ProvisionedThroughput:
