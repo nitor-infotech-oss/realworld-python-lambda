@@ -288,6 +288,37 @@ def list_article(event, context):
 def get_tags(event,context):
     unique_tags = {}
     last_evaluated_key = None
+    pe = 'tagList'
+    articles_table = dynamodb.Table('dev-articles')
+    if last_evaluated_key:
+        response = articles_table.scan(
+            ProjectionExpression=pe,
+            ExclusiveStartKey=last_evaluated_key
+        )
+    else:
+        response = articles_table.scan(
+            ProjectionExpression=pe,
+        )
+
+    for item in response['Items']:
+        if item['email'] and item['email'].values():
+            for i in item['email'].values():
+                unique_tags[i] = 1
+                # print(f"TAG: {i} UTAG: {unique_tags}")
+    last_evaluated_key = response['LastEvaluatedKey']
+
+    while last_evaluated_key in response:
+        tags = unique_tags.keys()
+        # response = articles_table.scan(
+        #     ProjectionExpression=pe,
+        #     # FilterExpression=fe,
+        #     # ExpressionAttributeNames=ean,
+        #     ExclusiveStartKey=response['LastEvaluatedKey']
+        # )
+        #
+        # for i in response['Items']:
+        #     print(i)
+    return {'tags': tags}
 
 
 def query_enough_articles(query_params, authenticated_user,limit, offset):
