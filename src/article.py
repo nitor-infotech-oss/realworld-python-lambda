@@ -284,6 +284,48 @@ def list_article(event, context):
         'articles':query_enough_articles(query_params, authenticated_user,limit, offset)
     }
 
+                        
+def get_feed(event, context):
+    authenticated_user = user.authenticate_and_get_user(event, context)
+    if not authenticated_user:
+        logging.error("Validation Failed")
+        raise Exception("Must be logged in.", 422)
+
+    params = event['queryStringParameters'] or {}
+    limit = int(params['limit']) or 20
+    offset = int(params['offset']) or 0
+
+    followed = user.get_followed_users(authenticated_user['username'])
+    if not len(followed):
+        return {'articles': []}
+
+    query_params = {
+        'IndexName':'updatedAt',
+        'KeyConditionExpression': 'dummy = :dummy',
+        'FilterExpression': 'author IN ',
+        'ExpressionAttributeValues': {
+            ':dummy': 'OK',
+        },
+        'ScanIndexForward': False,
+    }
+
+    for i in range(0, len(followed)):
+        query_params['ExpressionAttributeValues'][f":author{i}"] = followed[i]
+    # ExpressionAttributeValues
+    eav = query_params['ExpressionAttributeValues']
+
+    list_query_params = filter(lambda x: x != ':dummy', query_params['ExpressionAttributeValues'].keys())
+
+    # list_queryParams = map(lambda x:x.replace("'",""), list_query_params)
+    list_query_params = tuple(list_query_params)
+    # fe = "author IN{}".format(list_queryParams)
+    # FilterExpression
+    fe = str(list_query_params).replace("'", "")
+
+    articles = get_enough_article_query_tags(eav, fe, authenticated_user, offset, limit)
+
+    return {'articles': articles}
+
 
 def get_tags(event,context):
     unique_tags = {}
@@ -342,6 +384,41 @@ def query_enough_articles(query_params, authenticated_user,limit, offset):
     return articles
 
 
+def get_enough_article_query_tags(eav, fe, authenticated_user, offset, limit):
+    # print(f"FILTER EXP: {filter_exp}")
+    query_result_item = []
+    table = dynamodb.Table('dev-articles')
+    while len(query_result_item) < (offset + limit):
+        query_result = table.query(
+            IndexName='updatedAt',
+            KeyConditionExpression='dummy= :dummy',
+            FilterExpression='author IN'+fe,
+            ExpressionAttributeValues=eav,
+            ScanIndexForward=False,
+        )
+        query_result_item.append(query_result['Items'])
+        if query_result['LastEvaluatedKey']:
+            # filter_exp.ExclusiveStartKey = query_result.LastEvaluatedKey
+            query_result = table.query(
+                IndexName='updatedAt',
+                KeyConditionExpression='dummy= :dummy',
+                FilterExpression='author IN' + fe,
+                ExpressionAttributeValues=eav,
+                ScanIndexForward=False,
+                ExclusiveStartKey=query_result['LastEvaluatedKey']
+            )
+        else:
+            break
+        print(f"get_enough_article_query:{query_result}")
+
+    article_data_list = []
+    res = query_result_item[offset:(offset + limit)]
+    for data in res:
+        article_data_list.append(transform_retrieved_article(data, authenticated_user))
+    articles = article_data_list
+    return {'articles': articles}                        
+  
+                        
 def transform_retrieved_article(article, authenticated_user):
     del article['dummy']
     article['tagList'] = article['tagList'] if article['tagList'] else article['tagList'] = []
