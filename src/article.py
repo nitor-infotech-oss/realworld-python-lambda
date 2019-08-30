@@ -332,6 +332,7 @@ def get_tags(event,context):
     last_evaluated_key = None
     pe = 'tagList'
     articles_table = dynamodb.Table('dev-articles')
+    tags = ''
     if last_evaluated_key:
         response = articles_table.scan(
             ProjectionExpression=pe,
@@ -341,25 +342,20 @@ def get_tags(event,context):
         response = articles_table.scan(
             ProjectionExpression=pe,
         )
-
+    print(f"RESPONSE: {response}")
     for item in response['Items']:
-        if item['email'] and item['email'].values():
-            for i in item['email'].values():
+        if item['tagList'] and item.keys():
+            for i in item['tagList']:
                 unique_tags[i] = 1
-                # print(f"TAG: {i} UTAG: {unique_tags}")
-    last_evaluated_key = response['LastEvaluatedKey']
-
-    while last_evaluated_key in response:
-        tags = unique_tags.keys()
-        # response = articles_table.scan(
-        #     ProjectionExpression=pe,
-        #     # FilterExpression=fe,
-        #     # ExpressionAttributeNames=ean,
-        #     ExclusiveStartKey=response['LastEvaluatedKey']
-        # )
-        #
-        # for i in response['Items']:
-        #     print(i)
+#                 print(f"TAG: {i} UTAG: {unique_tags}")
+    try:            
+        last_evaluated_key = response['LastEvaluatedKey']
+        while last_evaluated_key in response:
+            tags = unique_tags.keys()
+            print(tags)
+    except:
+        pass
+    
     return {'tags': tags}
 
 
