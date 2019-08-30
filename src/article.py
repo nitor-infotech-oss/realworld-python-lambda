@@ -417,14 +417,21 @@ def get_enough_article_query_tags(eav, fe, authenticated_user, offset, limit):
                         
 def transform_retrieved_article(article, authenticated_user):
     del article['dummy']
-    article['tagList'] = article['tagList'] if article['tagList'] else article['tagList'] = []
-    article['favoritesCount'] = article['favoritesCount'] or 0
+#     article['tagList'] = article['tagList'] if article['tagList'] else article['tagList'] = []
+#     article['favoritesCount'] = article['favoritesCount'] or 0
     article['favorited'] = False
 
-    if article['favoritedBy'] and authenticated_user:
-        article['favorited'] = article['favoritedBy'] in authenticated_user['username']
+    try:
+        article['tagList'] = article['tagList']
+        article['favoritesCount'] = article['favoritesCount']
 
-    del article['favoritedBy']
-    article['author'] = user.get_profile_by_username(article['author'],authenticated_user)
+        if article['favoritedBy'] and authenticated_user:
+            article['favorited'] = authenticated_user['username'] in article['favoritedBy']
+        del article['favoritedBy']
+    except Exception as e:
+        article['favoritesCount'] = 0
+        article['tagList'] = []
+                        
+    article['author'] = user.get_profile_by_username(article['author'], authenticated_user)
 
     return article
