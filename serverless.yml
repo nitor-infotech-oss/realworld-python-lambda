@@ -11,7 +11,7 @@
 #
 # Happy Coding!
 
-service: realworld-python-lambda # NOTE: update this with your service name
+service: realworld-python-lambdas # NOTE: update this with your service name
 #app: your-app-name
 #tenant: your-tenant-name
 
@@ -36,6 +36,44 @@ provider:
         - dynamodb:DeleteItem
       Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/*"
 
+plugins:
+  - serverless-python-requirements
+
+#custom:
+#  pythonRequirements:
+#    dockerizePip: non-linux
+# you can overwrite defaults here
+#  stage: dev
+#  region: us-east-1
+
+# you can add statements to the Lambda function's IAM Role here
+#  iamRoleStatements:
+#    - Effect: "Allow"
+#      Action:
+#        - "s3:ListBucket"
+#      Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ] ]  }
+#    - Effect: "Allow"
+#      Action:
+#        - "s3:PutObject"
+#      Resource:
+#        Fn::Join:
+#          - ""
+#          - - "arn:aws:s3:::"
+#            - "Ref" : "ServerlessDeploymentBucket"
+#            - "/*"
+
+# you can define service wide environment variables here
+#  environment:
+#    variable1: value1
+
+# you can add packaging information here
+#package:
+#  include:
+#    - include-me.py
+#    - include-me-dir/**
+#  exclude:
+#    - exclude-me.py
+#    - exclude-me-dir/**
 
 functions:
   create_user:
@@ -52,6 +90,17 @@ functions:
           path: /api/users/login
           method: POST
           cors: true
+#          cors:
+#            origins:
+#              - 'http://localhost:4100'
+#            headers:
+#              - MY_CUSTOM_HEADER
+#              - Content-Type
+#              - X-Amz-Date
+#              - Authorization
+#              - X-Api-Key
+#              - X-Amz-Security-Token
+#            allowCredentials: false
   get_user:
     handler: src/user.get_user
     events:
@@ -59,6 +108,7 @@ functions:
           path: /api/user
           method: GET
           cors: true
+
   update_user:
     handler: src/user.update_user
     events:
@@ -73,6 +123,7 @@ functions:
           method: GET
           path: /api/profiles/{username}
           cors: true
+
   follow_user:
     handler: src/user.follow
     events:
@@ -87,8 +138,175 @@ functions:
       - http:
           method: DELETE
           path: /api/profiles/{username}/follow
-          cors: true          
+          cors: true
 
+  # Article API
+  create_article:
+    handler: src/article.create_article
+    events:
+      - http:
+          method: POST
+          path: /api/articles
+          cors: true
+
+
+  get_article:
+    handler: src/article.get_article
+    events:
+      - http:
+          method: GET
+          path: /api/articles/{slug}
+          cors: true
+
+
+  update_article:
+    handler: src/article.update_article
+    events:
+      - http:
+          method: PUT
+          path: /api/articles/{slug}
+          cors: true
+
+
+  delete_article:
+    handler: src/article.delete_article
+    events:
+      - http:
+          method: DELETE
+          path: /api/articles/{slug}
+          cors: true
+
+  favorite_article:
+    handler: src/article.favorite_article
+    events:
+      - http:
+          method: POST
+          path: /api/articles/{slug}/favorite
+          cors: true
+
+  unfavorite_article:
+    handler: src/article.favorite_article
+    events:
+      - http:
+          method: DELETE
+          path: /api/articles/{slug}/favorite
+          cors: true
+
+  list_article:
+    handler: src/article.list_article
+    events:
+      - http:
+          method: GET
+          path: /api/articles
+          cors: true
+
+
+  get_feed:
+    handler: src/article.get_feed
+    events:
+      - http:
+          method: GET
+          path: /api/articles/feed
+          cors: true
+
+
+  get_tags:
+    handler: src/article.get_tags
+    events:
+      - http:
+          method: GET
+          path: /api/tags
+          cors: true
+#          cors:
+#            origins:
+#              - 'http://localhost:4100'
+#            headers:
+#              - Content-Type
+#              - X-Amz-Date
+#              - Authorization
+#              - X-Api-Key
+#              - X-Amz-Security-Token
+#              - X-Amz-User-Agent
+#            allowCredentials: false
+
+
+  # Comment API
+  create_comment:
+    handler: src/comment.create
+    events:
+      - http:
+          method: POST
+          path: /api/articles/{slug}/comments
+          cors: true
+
+  get_comments:
+    handler: src/comment.get
+    events:
+      - http:
+          method: GET
+          path: /api/articles/{slug}/comments
+          cors: true
+
+
+  delete_comment:
+    handler: src/comment.delete
+    events:
+      - http:
+          method: DELETE
+          path: /api/articles/{slug}/comments/{id}
+          cors: true
+
+#    The following are a few example events you can configure
+#    NOTE: Please make sure to change your handler code to work with those events
+#    Check the event documentation for details
+#    events:
+#      - http:
+#          path: users/create
+#          method: get
+#      - websocket: $connect
+#      - s3: ${env:BUCKET}
+#      - schedule: rate(10 minutes)
+#      - sns: greeter-topic
+#      - stream: arn:aws:dynamodb:region:XXXXXX:table/foo/stream/1970-01-01T00:00:00.000
+#      - alexaSkill: amzn1.ask.skill.xx-xx-xx-xx
+#      - alexaSmartHome: amzn1.ask.skill.xx-xx-xx-xx
+#      - iot:
+#          sql: "SELECT * FROM 'some_topic'"
+#      - cloudwatchEvent:
+#          event:
+#            source:
+#              - "aws.ec2"
+#            detail-type:
+#              - "EC2 Instance State-change Notification"
+#            detail:
+#              state:
+#                - pending
+#      - cloudwatchLog: '/aws/lambda/hello'
+#      - cognitoUserPool:
+#          pool: MyUserPool
+#          trigger: PreSignUp
+#      - alb:
+#          listenerArn: arn:aws:elasticloadbalancing:us-east-1:XXXXXX:listener/app/my-load-balancer/50dc6c495c0c9188/
+#          priority: 1
+#          conditions:
+#            host: example.com
+#            path: /hello
+
+#    Define function environment variables here
+#    environment:
+#      variable2: value2
+
+# you can add CloudFormation resource templates here
+#resources:
+#  Resources:
+#    NewResource:
+#      Type: AWS::S3::Bucket
+#      Properties:
+#        BucketName: my-new-bucket
+#  Outputs:
+#     NewOutput:
+#       Description: "Description for the output"
+#       Value: "Some output value"
 resources:
   Resources:
 
@@ -109,7 +327,7 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        TableName: ${self:provider.environment.DYNAMODB_NAMESPACE}-users
+        TableName: ${self:provider.environment.DYNAMODB_NAMESPACE}-user
         GlobalSecondaryIndexes:
           - IndexName: email
             KeySchema:
@@ -120,3 +338,82 @@ resources:
             ProvisionedThroughput:
               ReadCapacityUnits: 1
               WriteCapacityUnits: 1
+
+    ArticlesDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: slug
+            AttributeType: S
+          - AttributeName: dummy
+            AttributeType: S
+          - AttributeName: updatedAt
+            AttributeType: N
+        KeySchema:
+          - AttributeName: slug
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DYNAMODB_NAMESPACE}-article
+        GlobalSecondaryIndexes:
+          - IndexName: updatedAt
+            KeySchema:
+              - AttributeName: dummy
+                KeyType: HASH
+              - AttributeName: updatedAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+
+    CommentsDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: slug
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DYNAMODB_NAMESPACE}-comments
+        GlobalSecondaryIndexes:
+          - IndexName: article
+            KeySchema:
+              - AttributeName: slug
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+#    GatewayResponse:
+#      Type: 'AWS::ApiGateway::GatewayResponse'
+#      Properties:
+#        ResponseParameters:
+#          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+#          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+#        ResponseType: EXPIRED_TOKEN
+#        RestApiId:
+#          Ref: 'ApiGatewayRestApi'
+#        StatusCode: '401'
+#    AuthFailureGatewayResponse:
+#      Type: 'AWS::ApiGateway::GatewayResponse'
+#      Properties:
+#        ResponseParameters:
+#          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+#          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+#        ResponseType: UNAUTHORIZED
+#        RestApiId:
+#          Ref: 'ApiGatewayRestApi'
+#        StatusCode: '401'
+
