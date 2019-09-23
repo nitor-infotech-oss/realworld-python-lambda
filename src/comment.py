@@ -2,6 +2,7 @@ import json
 import boto3
 import logging
 import uuid
+import time
 from datetime import datetime
 from boto3.dynamodb.conditions import Key, Attr
 from src import user
@@ -11,31 +12,24 @@ dynamodb = boto3.resource('dynamodb')
 
 
 def create(event, context):
-    print(f"IN CREATE COMMENT EVENT: {event}")
     authenticated_user = user.authenticate_and_get_user(event, context)
-    print(authenticated_user)
     if not authenticated_user:
         logging.error("Validation Failed")
         raise Exception("Must be logged in.", 422)
 
     data = json.loads(event['body'])
-    print("++++++++++++++++++++++++++++++",type(data))
-    print(f"comment data: {data}")
     if not data['comment']:
         logging.error("Validation Failed")
         raise Exception("Comment must be specified", 422)
 
     table = dynamodb.Table('dev-article')
     comment_body = data['comment']['body']
-    print("*****************************",type(comment_body))
-    print(f"comment_body data: {comment_body}")
     slug = event['pathParameters']['slug']
     article = table.get_item(
         Key={
             'slug': slug
         }
     )['Item']
-    print(article)
 
     if not article:
         logging.error("Validation Failed")
@@ -46,8 +40,8 @@ def create(event, context):
         'id': str(uuid.uuid1()),
         'slug': slug,
         'body': comment_body,
-        'created_at': timestamp,
-        'updated_at': timestamp,
+        'createdAt': timestamp,
+        'updatedAt': timestamp,
         'author': authenticated_user['username']
     }
 
@@ -55,7 +49,7 @@ def create(event, context):
     comment_table.put_item(Item=comment)
 
     if 'bio' in authenticated_user:
-        authenticated_user['bio'] = user['bio']
+        authenticated_user['bio'] = authenticated_user['bio']
     else:
         authenticated_user['bio'] = ''
     if 'image' in authenticated_user:
@@ -70,23 +64,13 @@ def create(event, context):
         'following': False
     }
 
-    response = {
-        "statusCode": 200,
-        "headers": {
-            'Access-Control-Allow-Origin': 'http://localhost:4100',
-            'Access-Control-Allow-Credentials': True
-        },
-        "comment": comment
-    }
     res = {
         "comment": comment
     }
-    print(f"create comment res :{res}")
     return envelop(res)
 
 
 def get(event, context):
-    print(f"GET COMMENT EVENT: {event}")
     authenticated_user = user.authenticate_and_get_user(event, context)
     slug = event['pathParameters']['slug']
 
@@ -102,21 +86,19 @@ def get(event, context):
     for i in range(len(comments)):
         comments[i]['author'] = user.get_profile_by_username(comments[i]['author'], authenticated_user)
     res = {
-        'comments':comments
+        'comments': comments
     }
-    # response = {
-    #     "statusCode": 200,
-    #     "headers": {
-    #         'Access-Control-Allow-Origin': 'http://localhost:4100',
-    #         'Access-Control-Allow-Credentials': 'true'
-    #     },
-    #     "body": json.dumps(res)
-    # }
+
+    for com_data in comments:
+        if 'updatedAt' and 'createdAt' in com_data:
+            com_data['updatedAt'] = time.ctime(float(com_data['updatedAt']))
+            com_data['createdAt'] = time.ctime(float(com_data['createdAt']))
+
     return envelop(res)
 
 
 def delete(event, context):
-    authenticated_user = user.authenticate_and_get_user(event, context);
+    authenticated_user = user.authenticate_and_get_user(event, context)
     if not authenticated_user:
         logging.error("Validation Failed")
         raise Exception('Must be logged in.', 422)
@@ -142,16 +124,10 @@ def delete(event, context):
             'id': comment_id
         }
     )
-    response = {
-        "statusCode": 200,
-        "headers": {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Credentials': 'true'
-        },
-        "comments": data
-    }
+
     res = {
         "comments": data
     }
+
     return envelop(res)
 

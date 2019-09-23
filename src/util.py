@@ -6,8 +6,7 @@ def envelop(res, status_code=200):
     if status_code == 200:
         body = json.dumps(res)
     else:
-        body = json.dumps({'errors': {'body': res}})
-    print(body)
+        body = json.dumps({"errors":{'': res}})
     return {
         "statusCode": status_code,
         "headers": {
