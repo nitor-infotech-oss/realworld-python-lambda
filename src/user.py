@@ -6,9 +6,10 @@ import time
 import boto3
 from boto3.dynamodb.conditions import Key, Attr
 # import bcrypt
-# import jwt
+import jwt
 from src.util import envelop
 from datetime import datetime, timedelta
+import calendar
 
 dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
 
@@ -19,8 +20,8 @@ JWT_EXP_DELTA_SECONDS = 172800  # 2 days
 
 # create user
 def create_user(event, context):
-    data = event['user']
-    
+    json_data = json.loads(event['body'])
+    data = json_data['user']
     if 'username' not in data:
         logging.error("Validation Failed")
         raise Exception("Username must be specified.", 422)
@@ -33,7 +34,7 @@ def create_user(event, context):
 
     timestamp = str(datetime.utcnow().timestamp())
 
-    table = dynamodb.Table('dev-users')
+    table = dynamodb.Table('dev-user')
 
     # Verify username is not taken
     user_exists = get_user_by_username(data['username'])
@@ -51,9 +52,7 @@ def create_user(event, context):
 
     # password = data['password'].encode()
     # hashed = bcrypt.hashpw(password, bcrypt.gensalt())
-    # encoded = jwt.encode({'token': data['username']}, 'secret', algorithm='HS256')
     item = {
-        # 'id': str(uuid.uuid1()),
         'username': data['username'],
         'email': data['email'],
         'password': data['password'],
@@ -63,39 +62,34 @@ def create_user(event, context):
 
     # create the user to the database
     table.put_item(Item=item)
-    token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbiI6ImdhdXRhbSJ9.5CLsX4nOuTagsC6nSGWfq-4oZZAL0RhlMLOm7QMGy_Q'
     body = {
         'email': data['email'],
-        # 'token': min_token(data['username']),
-        'token': token,
+        'token': min_token(data['username']),
         'username': data['username'],
         'bio': '',
         'image': ''
     }
     # create a response
-    response = {
-        "statusCode": 200,
-        "headers": {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Credentials': 'true'
-        },
+    res = {
         "user": body
     }
-
-    return response
+    return envelop(res)
 
 
 def min_token(a_username):
+    expire = datetime.now() + timedelta(minutes=60)
+    expire = calendar.timegm(expire.timetuple())
     payload = {
         'username': a_username,
-        'expiresIn': datetime.utcnow() + timedelta(seconds=JWT_EXP_DELTA_SECONDS)
+        # 'expiresIn': datetime.utcnow() + timedelta(seconds=JWT_EXP_DELTA_SECONDS)
+        'expiresIn': expire
     }
     jwt_token = jwt.encode(payload, JWT_SECRET, JWT_ALGORITHM)
-    return jwt_token
+    return str(jwt_token, 'UTF8')
 
 
 def get_user_by_username(username):
-    table = dynamodb.Table('dev-users')
+    table = dynamodb.Table('dev-user')
     print(username)
     try:
         response = table.get_item(
@@ -105,12 +99,11 @@ def get_user_by_username(username):
         )
     except Exception as e:
         response = None
-    print(f"RESP:{response}")
     return response
 
 
 def get_user_by_email(a_email):
-    table = dynamodb.Table('dev-users')
+    table = dynamodb.Table('dev-user')
     response = table.query(
         IndexName='email',
         KeyConditionExpression='email= :email',
@@ -119,52 +112,55 @@ def get_user_by_email(a_email):
         },
         Select='ALL_ATTRIBUTES',
     )
-    print(f"EMAIL:{response}")
     return response
 
 
 # login user
 def login_user(event, context):
-    data = event['user']
+    load_data = json.loads(event['body'])
+    data = load_data
     if not data:
         logging.error("Validation Failed")
         raise Exception("User must be specified.", 422)
-    if 'email' not in data:
+    if 'email' not in data['user']:
         logging.error("Validation Failed")
         raise Exception("Email must be specified.", 422)
-    if 'password' not in data:
+    if 'password' not in data['user']:
         logging.error("Validation Failed")
         raise Exception("Password must be specified.", 422)
 
     # Get user with this email
-    get_user_with_this_email = get_user_by_email(data['email'])
+    get_user_with_this_email = get_user_by_email(data['user']['email'])
     if get_user_with_this_email['Count'] != 1:
         logging.error("Validation Failed")
-        raise Exception(f"Email not fount: {data['email']}.", 422)
+        # raise Exception(f"Email not fount: {data['user']['email']}.", 422)
+        return envelop(f"Email not fount: {data['user']['email']}.",422)
 
-    if get_user_with_this_email['Items'][0]['password'] != data['password']:
-        raise Exception("Wrong password.", 422)
+    if get_user_with_this_email['Items'][0]['password'] != data['user']['password']:
+        # raise Exception("Wrong password.", 422)
+        return envelop(f"Wrong password.", 422)
 
-    token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbiI6ImdhdXRhbSJ9.5CLsX4nOuTagsC6nSGWfq-4oZZAL0RhlMLOm7QMGy_Q'
+    if 'bio' in get_user_with_this_email['Items'][0]:
+        bio_content = get_user_with_this_email['Items'][0]['bio']
+    else:
+        bio_content = ''
+    if 'image' in get_user_with_this_email['Items'][0]:
+        image_url = get_user_with_this_email['Items'][0]['image']
+    else:
+        image_url = ''
 
     authenticated_user = {
-        'email': data['email'],
-        # 'token': min_token(get_user_with_this_email['Items'][0]['username']),
-        'token': token,
-        'username': get_user_with_this_email['Items'][0]['username']
-        # 'bio': get_user_with_this_email['Items'][0]['bio'] if get_user_with_this_email['Items'][0]['bio'] else '',
-        # 'image': get_user_with_this_email['Items'][0]['image'] if get_user_with_this_email['Items'][0]['image'] else ''
+        'email': data['user']['email'],
+        'token': min_token(get_user_with_this_email['Items'][0]['username']),
+        'username': get_user_with_this_email['Items'][0]['username'],
+        'bio': bio_content,
+        'image': image_url
     }
 
-    response = {
-        "statusCode": 200,
-        "headers": {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Credentials': 'true'
-        },
-        "user": authenticated_user
+    res = {
+        'user': authenticated_user
     }
-    return response
+    return envelop(res)
 
 
 # get user
@@ -172,32 +168,34 @@ def get_user(event, context):
     authenticated_user = authenticate_and_get_user(event, context)
     if not authenticated_user:
         raise Exception('Token not present or invalid.', 422)
-
-    body = {
+    if 'bio' in authenticated_user:
+        authenticated_user['bio'] = authenticated_user['bio']
+    else:
+        authenticated_user['bio'] = ''
+    if 'image' in authenticated_user:
+        authenticated_user['image'] = authenticated_user['image']
+    else:
+        authenticated_user['image'] = ''
+    user = {
         'email': authenticated_user['email'],
-        # 'token': get_token_from_event(event, context),
-        'username': authenticated_user['username']
-        # 'bio': authenticated_user['bio'] if authenticated_user['bio'] else '',
-        # 'image':  authenticated_user['image'] if authenticated_user['image'] else ''
+        'token': get_token_from_event(event, context),
+        'username': authenticated_user['username'],
+        'bio': authenticated_user['bio'],
+        'image':  authenticated_user['image'],
     }
 
-    response = {
-        "statusCode": 200,
-        "headers": {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Credentials': 'true'
-        },
-        "user": body
+    res = {
+        "user": user
     }
-    return response
+    return envelop(res)
 
 
 def update_user(event, context):
     authenticated_user = authenticate_and_get_user(event, context)
     if not authenticated_user:
         raise Exception('Token not present or invalid.', 422)
-    user = event
-    print(f"DATA: {user}")
+    json_user = json.loads(event['body'])
+    user = json_user['user']
     if not user:
         logging.error("Validation Failed")
         raise Exception("User must be specified.", 422)
@@ -210,11 +208,11 @@ def update_user(event, context):
         # Verify email is not taken
         user_with_this_email = get_user_by_email(user['email'])
         if user_with_this_email['Count'] != 0:
-            return Exception(f"Email already taken: {user['email']}", 422)
+            raise Exception(f"Email already taken: {user['email']}", 422)
 
         updated_user['email'] = user['email']
 
-    if user['password']:
+    if 'password' in user:
         # updatedUser.password = bcrypt.hashSync(user.password, 5);
         updated_user['password'] = user['password']
 
@@ -224,49 +222,50 @@ def update_user(event, context):
     if user['bio']:
         updated_user['bio'] = user['bio']
 
-    print(f"UPDATE: {updated_user}")
-
-    table = dynamodb.Table('dev-users')
+    table = dynamodb.Table('dev-user')
     table.put_item(Item=updated_user)
-
     if updated_user['password']:
         del updated_user['password']
 
     if not updated_user['email']:
         updated_user['email'] = authenticated_user['email']
 
-    if not updated_user['image']:
-        updated_user['image'] = authenticated_user['image'] if authenticated_user['image'] else ''
+    if 'image' not in updated_user:
+        if 'image' in authenticated_user:
+            updated_user['image'] = authenticated_user['image']
+        else:
+            updated_user['image'] = ''
+    else:
+        updated_user['image'] = updated_user['image']
 
-    if not updated_user['bio']:
-        updated_user['bio'] = authenticated_user['bio'] if authenticated_user['bio'] else ''
+    if 'bio' not in updated_user:
+        if 'bio' in authenticated_user:
+            updated_user['bio'] = authenticated_user['bio']
+        else:
+            updated_user['bio'] = ''
+    else:
+        updated_user['bio'] = updated_user['bio']
 
-    # updated_user['token'] = get_token_from_event(event, context)
+    updated_user['token'] = get_token_from_event(event, context)
 
-    response = {
-        "statusCode": 200,
-        "headers": {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Credentials': 'true'
-        },
-        "body": updated_user
+    res = {
+        "user": updated_user
     }
-
-    return response
+    return envelop(res)
 
 
 def get_profile(event, context):
     username = event['pathParameters']['username']
     authenticated_user = authenticate_and_get_user(event, context)
-    profile = get_profile_by_username(username, authenticated_user);
-    print(f"PROFILE: {profile}")
+    profile = get_profile_by_username(username, authenticated_user)
     if not profile:
         raise Exception(f"User not found: ${username}", 422)
 
     response = {
         "profile": profile
     }
-    return response
+
+    return envelop(response)
 
 
 def follow(event, context):
@@ -274,38 +273,36 @@ def follow(event, context):
     if not authenticated_user:
         raise Exception('Token not present or invalid.', 422)
     username = event['pathParameters']['username']
-    user = (get_user_by_username(username))['Item']
+    user = get_user_by_username(username)['Item']
     should_follow = (not event['httpMethod'] == 'DELETE')
 
     # Update "followers" field on followed user
     if should_follow:
-        if user['followers'] and authenticated_user['username'] not in user['followers']:
-            pass
+        if 'followers' in user and authenticated_user['username'] not in user['followers']:
             user['followers'].append(authenticated_user['username'])
         else:
             user['followers'] = [authenticated_user['username']]
     else:
-        if user['followers'] and authenticated_user['username'] in user['followers']:
+        if 'followers' in user and authenticated_user['username'] in user['followers']:
             # create new list of follower except authenticated user
             follow_result = filter(lambda x: x != authenticated_user['username'], user['followers'])
             user['followers'] = list(follow_result)
 
             # delete followers if list is empty
             if not len(user['followers']):
-                print("In Delete condition")
                 del user['followers']
 
-    table = dynamodb.Table('dev-users')
+    table = dynamodb.Table('dev-user')
     table.put_item(Item=user)
 
     # Update "following" field on follower user
     if should_follow:
-        if authenticated_user['following'] and authenticated_user['following'] not in username:
+        if 'following' in authenticated_user and username not in authenticated_user['following']:
             authenticated_user['following'].append(username)
         else:
             authenticated_user['following'] = [username]
     else:
-        if authenticated_user['following'] and authenticated_user['following'] in username:
+        if 'following' in authenticated_user and username not in authenticated_user['following']:
             # create new list of following except username
             result = filter(lambda x: x != username, authenticated_user['following'])
             authenticated_user['following'] = list(result)
@@ -315,74 +312,83 @@ def follow(event, context):
                 del authenticated_user['following']
 
     table.put_item(Item=authenticated_user)
+    if 'bio' in user:
+        user['bio'] = user['bio']
+    else:
+        user['bio'] = ''
+    if 'image' in user:
+        user['image'] = user['image']
+    else:
+        user['image'] = ''
 
     profile = {
         'username': username,
-        'bio': user['bio'] if user['bio'] else '',
-        'image': user['image'] if user['bio'] else '',
+        'bio': user['bio'],
+        'image': user['image'],
         'following': should_follow
     }
 
-    response = {
-        "statusCode": 200,
-        "headers": {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Credentials': 'true'
-        },
+    res = {
         "profile": profile
     }
-
-    return response
+    return envelop(res)
 
 
 # create followed users
 def get_followed_users(a_username):
-    table = dynamodb.Table('dev-users')
+    table = dynamodb.Table('dev-user')
     user = table.get_item(
         Key={
             'username': a_username
         }
     )['Item']
-
-    return user['following'] or user['following']== []
+    if 'following' in user:
+        user['following'] = user['following']
+    else:
+        user['following'] = []
+    return user['following']
 
 
 def get_token_from_event(event, context):
-    pass
-    # return event.headers.Authorization.replace('Token ', '')
-    return event['headers']['authorization'].replace('Token', '')
+    return event['headers']['Authorization'].replace('Token ', '')
 
 
 def get_profile_by_username(a_username, a_authenticated_user):
     user = get_user_by_username(a_username)['Item']
-    print(f"PROFILE USER: {user}")
     if not user:
         return None
+    if 'bio' in user:
+        user['bio'] = user['bio']
+    else:
+        user['bio'] = ''
+    if 'image' in user:
+        user['image'] = user['image']
+    else:
+        user['image'] = ''
 
     profile = {
-        'username': user['username']
-        # 'bio': user['bio'] if user['bio'] else '',
-        # 'image': user['image'] if user['image'] else '',
-        # 'following': False,
+        'username': user['username'],
+        'bio': user['bio'],
+        'image': user['image'],
+        'following': False,
     }
 
     # If user is authenticated, set following bit
-    if user['followers'] and a_authenticated_user:
-        profile['following'] = user['followers']in a_authenticated_user['username']
+    if 'followers' in user and a_authenticated_user:
+        profile['following'] = a_authenticated_user['username'] in user['followers']
 
     return profile
 
 
 def authenticate_and_get_user(event, context):
-    if 'username' in event:
-        username = event['username']
-    else:
-        username = event['pathParameters']['username']
+    print(f"AUTH&GETUSER EVENT: {event}")
     try:
-        # token = get_token_from_event(event, context)
-        # decoded = jwt.verify(token, Util.tokenSecret),
-        username = username  # decoded.username,
+        token = get_token_from_event(event, context)
+        decoded = jwt.decode(token, JWT_SECRET, JWT_ALGORITHM)# verify=False
+        username = decoded['username']
         authenticated_user = get_user_by_username(username)
         return authenticated_user['Item']
     except Exception as e:
+        print(f"EXCEPTION :{e}")
         return None
+

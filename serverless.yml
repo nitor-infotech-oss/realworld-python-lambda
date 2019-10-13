@@ -1,23 +1,5 @@
-# Welcome to Serverless!
-#
-# This file is the main config file for your service.
-# It's very minimal at this point and uses default values.
-# You can always add more config options for more control.
-# We've included some commented out config examples here.
-# Just uncomment any of them to get that config option.
-#
-# For full config options, check the docs:
-#    docs.serverless.com
-#
-# Happy Coding!
+service: realworld-python-lambdas # NOTE: update this with your service name
 
-service: realworld-python-lambda # NOTE: update this with your service name
-#app: your-app-name
-#tenant: your-tenant-name
-
-# You can pin your service to only deploy with a specific Serverless version
-# Check out our docs for more details
-# frameworkVersion: "=X.X.X"
 
 provider:
   name: aws
@@ -36,8 +18,12 @@ provider:
         - dynamodb:DeleteItem
       Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/*"
 
+plugins:
+  - serverless-python-requirements
+
 
 functions:
+  # User API
   create_user:
     handler: src/user.create_user
     events:
@@ -45,6 +31,7 @@ functions:
           path: /api/users
           method: post
           cors: true
+
   login_user:
     handler: src/user.login_user
     events:
@@ -52,6 +39,7 @@ functions:
           path: /api/users/login
           method: POST
           cors: true
+
   get_user:
     handler: src/user.get_user
     events:
@@ -59,6 +47,7 @@ functions:
           path: /api/user
           method: GET
           cors: true
+
   update_user:
     handler: src/user.update_user
     events:
@@ -66,6 +55,7 @@ functions:
           path: /api/user
           method: PUT
           cors: true
+
   get_profile:
     handler: src/user.get_profile
     events:
@@ -73,6 +63,7 @@ functions:
           method: GET
           path: /api/profiles/{username}
           cors: true
+
   follow_user:
     handler: src/user.follow
     events:
@@ -87,7 +78,106 @@ functions:
       - http:
           method: DELETE
           path: /api/profiles/{username}/follow
-          cors: true          
+          cors: true
+
+  # Article API
+  create_article:
+    handler: src/article.create_article
+    events:
+      - http:
+          method: POST
+          path: /api/articles
+          cors: true
+
+  get_article:
+    handler: src/article.get_article
+    events:
+      - http:
+          method: GET
+          path: /api/articles/{slug}
+          cors: true
+
+  update_article:
+    handler: src/article.update_article
+    events:
+      - http:
+          method: PUT
+          path: /api/articles/{slug}
+          cors: true
+
+  delete_article:
+    handler: src/article.delete_article
+    events:
+      - http:
+          method: DELETE
+          path: /api/articles/{slug}
+          cors: true
+
+  favorite_article:
+    handler: src/article.favorite_article
+    events:
+      - http:
+          method: POST
+          path: /api/articles/{slug}/favorite
+          cors: true
+
+  unfavorite_article:
+    handler: src/article.favorite_article
+    events:
+      - http:
+          method: DELETE
+          path: /api/articles/{slug}/favorite
+          cors: true
+
+  list_article:
+    handler: src/article.list_article
+    events:
+      - http:
+          method: GET
+          path: /api/articles
+          cors: true
+
+  get_feed:
+    handler: src/article.get_feed
+    events:
+      - http:
+          method: GET
+          path: /api/articles/feed
+          cors: true
+
+  get_tags:
+    handler: src/article.get_tags
+    events:
+      - http:
+          method: GET
+          path: /api/tags
+          cors: true
+
+  # Comment API
+  create_comment:
+    handler: src/comment.create
+    events:
+      - http:
+          method: POST
+          path: /api/articles/{slug}/comments
+          cors: true
+
+  get_comments:
+    handler: src/comment.get
+    events:
+      - http:
+          method: GET
+          path: /api/articles/{slug}/comments
+          cors: true
+
+  delete_comment:
+    handler: src/comment.delete
+    events:
+      - http:
+          method: DELETE
+          path: /api/articles/{slug}/comments/{id}
+          cors: true
+
 
 resources:
   Resources:
@@ -109,7 +199,7 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        TableName: ${self:provider.environment.DYNAMODB_NAMESPACE}-users
+        TableName: ${self:provider.environment.DYNAMODB_NAMESPACE}-user
         GlobalSecondaryIndexes:
           - IndexName: email
             KeySchema:
@@ -120,3 +210,63 @@ resources:
             ProvisionedThroughput:
               ReadCapacityUnits: 1
               WriteCapacityUnits: 1
+
+    ArticlesDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: slug
+            AttributeType: S
+          - AttributeName: dummy
+            AttributeType: S
+          - AttributeName: updatedAt
+            AttributeType: N
+        KeySchema:
+          - AttributeName: slug
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DYNAMODB_NAMESPACE}-article
+        GlobalSecondaryIndexes:
+          - IndexName: updatedAt
+            KeySchema:
+              - AttributeName: dummy
+                KeyType: HASH
+              - AttributeName: updatedAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+
+    CommentsDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: slug
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DYNAMODB_NAMESPACE}-comments
+        GlobalSecondaryIndexes:
+          - IndexName: article
+            KeySchema:
+              - AttributeName: slug
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+
+

@@ -1,0 +1,16 @@
+bcrypt==3.1.7
+boto3==1.9.215
+botocore==1.12.215
+cffi==1.12.3
+docutils==0.15.2
+jmespath==0.9.4
+jsonify==0.5
+pycparser==2.19
+PyJWT==1.7.1
+python-dateutil==2.8.0
+python-slugify==3.0.3
+s3transfer==0.2.1
+simplejson==3.16.0
+six==1.12.0
+text-unidecode==1.2
+urllib3==1.25.3
